@@ -150,3 +150,6 @@ python -m pytest -q
 
 They need `bdnmc_jax` (installed, or `BDNMC_JAX_SRC=<BdNMC>/gpu/src`), run on a CPU without DUNE software, and
 include a few 2^16-trial blocks of a real ND-LAr card (under a minute on a laptop).
+
+CI (`.github/workflows/ci.yml`) runs them on every push and pull request and weekly, against the head of the
+port's `gpu-port` branch, and checks that the job script and the container recipe's `%post` parse.
