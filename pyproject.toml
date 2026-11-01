@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bdnmc-dune"
+version = "0.1.0"
+description = "BdNMC light-dark-matter event generation for the DUNE Near Detector: ND-LAr cards and frame, edep-sim HEPEVT input, container and job recipes"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+# bdnmc-jax: the JAX port in RobMina/BdNMC (branch gpu-port, subdirectory gpu; needs output.write_hepevt, 3dd00be)
+dependencies = ["numpy", "bdnmc-jax @ git+https://github.com/RobMina/BdNMC.git@gpu-port#subdirectory=gpu"]
+
+[project.optional-dependencies]
+test = ["pytest", "h5py"]
+
+[tool.setuptools.packages.find]
+include = ["bdnmc_dune*"]
+
+[tool.setuptools.package-data]
+bdnmc_dune = ["data/*.toml", "data/*.sh"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

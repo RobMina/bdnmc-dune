@@ -1,0 +1,100 @@
+Bootstrap: docker
+From: almalinux:9
+
+# One AlmaLinux 9 image for both stages of a bdnmc-dune job:
+#   stage A  BdNMC's JAX port (bdnmc_jax, GPU or CPU) and bdnmc_dune;
+#   stage B  the ND simulation layer: ROOT, Geant4 (with GDML) and edep-sim, built from source as edep-sim's README
+#            describes (https://github.com/ClarkMcGrew/edep-sim, tested upstream with Geant4 11.4 and ROOT 6.36).
+# AL9 has glibc 2.34; the JAX wheels need >= 2.27 (manylinux_2_27). The CUDA runtime comes with the jax-cuda12
+# wheels; the host supplies only the NVIDIA driver (apptainer exec --nv).
+#
+# Status: written, NOT built or run (2026-10-31). The user builds every image; see containers/README.md.
+# Build from the repository root (the %files paths are relative to it):
+#   apptainer build bdnmc-dune.sif containers/bdnmc-dune.def
+#
+# Not included: DUNE's ND geometry (GDML), larnd-sim and the rest of the ND production chain. DUNE's own
+# production images (docker://mjkramer/sim2x2, used by github.com/DUNE/ND_Production) are Fedora 37 based; see
+# containers/README.md for that alternative.
+
+%arguments
+    BDNMC_REF=gpu-port
+    PYTHON=python3.12
+    JAX_VERSION=0.12.0.1
+    ROOT_VERSION=6.36.04
+    GEANT4_VERSION=11.4.0
+    EDEPSIM_REF=4.4.0
+    JOBS=8
+
+%files
+    . /opt/bdnmc-dune
+
+%post
+    set -eu
+    # ---------------------------------------------------------------- system packages
+    dnf -y install dnf-plugins-core epel-release
+    dnf config-manager --set-enabled crb
+    dnf -y install git gcc gcc-c++ gcc-gfortran make cmake binutils patch which file tar xz bzip2 \
+        openssl-devel zlib-devel xz-devel libzstd-devel lz4-devel pcre2-devel \
+        libX11-devel libXpm-devel libXft-devel libXext-devel \
+        expat-devel xerces-c-devel \
+        {{ PYTHON }} {{ PYTHON }}-devel {{ PYTHON }}-pip
+    dnf clean all
+
+    # ---------------------------------------------------------------- stage A: JAX port + bdnmc_dune
+    {{ PYTHON }} -m venv /opt/venv
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip
+    /opt/venv/bin/pip install --no-cache-dir "jax[cuda12]=={{ JAX_VERSION }}" numpy h5py pytest
+    git clone https://github.com/RobMina/BdNMC.git /opt/BdNMC
+    git -C /opt/BdNMC checkout "{{ BDNMC_REF }}"
+    git -C /opt/BdNMC rev-parse HEAD > /opt/BdNMC/COMMIT
+    /opt/venv/bin/pip install --no-cache-dir --no-deps /opt/BdNMC/gpu
+    /opt/venv/bin/pip install --no-cache-dir --no-deps /opt/bdnmc-dune
+
+    # ---------------------------------------------------------------- stage B: ROOT, Geant4, edep-sim
+    mkdir -p /opt/src && cd /opt/src
+    # ROOT (C++17, like Geant4; edep-sim checks that ROOT and its own C++ standard agree). PyROOT against the
+    # venv's Python so edep-sim's ROOT files can be read from the same interpreter.
+    curl -fsSL "https://root.cern/download/root_v{{ ROOT_VERSION }}.source.tar.gz" | tar xz
+    cmake -S "root-{{ ROOT_VERSION }}" -B root-build -DCMAKE_INSTALL_PREFIX=/opt/root -DCMAKE_CXX_STANDARD=17 \
+        -Dgdml=ON -Dopengl=OFF -Dx11=ON -Dpyroot=ON -DPython3_EXECUTABLE=/opt/venv/bin/python \
+        -Dbuiltin_glew=ON -Dbuiltin_gsl=ON -Dbuiltin_tbb=ON -Droofit=OFF -Dtmva=OFF -Dxrootd=OFF
+    cmake --build root-build -j"{{ JOBS }}" --target install
+    # Geant4 with GDML (required by edep-sim) and its data sets (several GB; downloaded at build time).
+    curl -fsSL "https://gitlab.cern.ch/geant4/geant4/-/archive/v{{ GEANT4_VERSION }}/geant4-v{{ GEANT4_VERSION }}.tar.gz" | tar xz
+    cmake -S "geant4-v{{ GEANT4_VERSION }}" -B geant4-build -DCMAKE_INSTALL_PREFIX=/opt/geant4 \
+        -DCMAKE_CXX_STANDARD=17 -DGEANT4_USE_GDML=ON -DGEANT4_INSTALL_DATA=ON -DGEANT4_BUILD_MULTITHREADED=OFF
+    cmake --build geant4-build -j"{{ JOBS }}" --target install
+    # edep-sim (tag {{ EDEPSIM_REF }}; 4.4.0 is master a3abbcf of 2026-09-01, the code whose HEPEVT reader was read)
+    git clone https://github.com/ClarkMcGrew/edep-sim.git
+    git -C edep-sim checkout "{{ EDEPSIM_REF }}"
+    git -C edep-sim rev-parse HEAD > /opt/EDEPSIM_COMMIT
+    . /opt/root/bin/thisroot.sh
+    . /opt/geant4/bin/geant4.sh
+    cmake -S edep-sim -B edep-build -DCMAKE_INSTALL_PREFIX=/opt/edep-sim -DCMAKE_CXX_STANDARD=17
+    cmake --build edep-build -j"{{ JOBS }}" --target install
+    cd / && rm -rf /opt/src
+
+    # ---------------------------------------------------------------- environment for every process
+    cat > /opt/environment.sh <<'EOF'
+. /opt/root/bin/thisroot.sh >/dev/null
+. /opt/geant4/bin/geant4.sh >/dev/null
+export PATH=/opt/venv/bin:/opt/edep-sim/bin:$PATH
+export LD_LIBRARY_PATH=/opt/edep-sim/lib:/opt/edep-sim/lib64:${LD_LIBRARY_PATH:-}
+EOF
+
+%environment
+    . /opt/environment.sh
+    export XLA_PYTHON_CLIENT_PREALLOCATE=false
+    export BDNMC_HOME=/opt/BdNMC
+
+%runscript
+    exec python3 -m bdnmc_dune "$@"
+
+%test
+    . /opt/environment.sh
+    python3 -c "import bdnmc_jax, bdnmc_dune, jax; print('bdnmc_jax', bdnmc_jax.PRECISION, 'jax', jax.__version__, jax.default_backend())"
+    command -v edep-sim
+    cd /opt/bdnmc-dune && python3 -m pytest -q
+
+%labels
+    Description bdnmc-dune: BdNMC JAX port + ROOT, Geant4, edep-sim on AlmaLinux 9

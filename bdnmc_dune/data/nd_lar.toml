@@ -1,0 +1,90 @@
+# ND-LAr and its placement relative to the LBNF target, from published DUNE and LBNF documents only.
+#
+# Every number is a table {value, unit, source}. `source` names a key of [sources] and the page or table; numbers
+# that are not DUNE's (generator settings, conventions) say so in their source. A field whose value is not public
+# is left at a neutral default and its source says "not public" or "user"; override it with --config.
+#
+# Frames (bdnmc_dune.geometry):
+# - beam frame (BdNMC's): origin at the target, +z along the neutrino beam axis, x horizontal and transverse to the
+#   beam, y = z cross x (in the vertical plane of the beam, pointing up);
+# - hall frame (the detector's axes): z horizontal along the beam's horizontal projection, y vertical up,
+#   x = y cross z (the same x as the beam frame). The beam points down by `beam.slope_at_nd` in this frame.
+
+[sources]
+ND_CDR = "DUNE Collaboration, Deep Underground Neutrino Experiment (DUNE) Near Detector Conceptual Design Report, arXiv:2103.13910 (2021), Instruments 5 (2021) 31. Page labels as printed in the arXiv v1 PDF."
+TDR_II = "DUNE Collaboration, DUNE Far Detector Technical Design Report, Volume II: DUNE Physics, arXiv:2002.03005 (2020). Page labels as printed in the arXiv PDF."
+LBNF_CDR3 = "LBNF/DUNE Conceptual Design Report, Volume 3: Long-Baseline Neutrino Facility for DUNE, arXiv:1601.05823 (2015)."
+PDG_LAR = "Particle Data Group, Atomic and Nuclear Properties of Materials, liquid argon: https://pdg.lbl.gov/2020/AtomicNuclearProperties/HTML/liquid_argon.html"
+CODATA = "CODATA 2018 recommended values (NIST); the Avogadro constant is exact in the 2019 SI."
+FORK_CARDS = "RobMina/BdNMC branch gpu-port, gpu/phase0/cards/he_pi0_cuboid_m005.dat and he_brem_cuboid_m005.dat (generic 120 GeV cards; generator settings, not DUNE numbers)."
+
+[beam]
+proton_energy = { value = 120.0, unit = "GeV", source = "TDR_II Table 8.1 (p. 8-245): 120 GeV, 1.2 MW; ND_CDR p. 3-99: 'proton beam momentum of 120 GeV/c'. BdNMC's beam_energy." }
+power = { value = 1.2, unit = "MW", source = "TDR_II Table 8.1 (p. 8-245); ND_CDR p. 1-4" }
+pot_per_year = { value = 1.1e21, unit = "POT/yr", source = "TDR_II Table 8.1 (p. 8-245), uptime fraction 0.56; ND_CDR p. 1-4 and p. 3-99 (nominal year)" }
+# Slope of the neutrino beam at the ND relative to the cavern horizontal plane. LBNF_CDR3 p. 6-99 gives the
+# primary-beam bend as 5.8 deg downward (Sec. 6.1; Sec. 5.5.2 gives the decay pipe a ~10 % decline); the ND CDR
+# value is the one stated for the ND hall and is used here. The two differ: an open question (README).
+slope_at_nd = { value = 5.3, unit = "deg", source = "ND_CDR Sec. 8.1.2, p. 8-250: 'angled by 5.3 deg with respect to the cavern horizontal plane'" }
+# The LBNF optimised-design target: graphite, so carbon for BdNMC's BMPT parametrisation (A = Z + N = 12).
+target_proton_number = { value = 6, unit = "", source = "TDR_II Sec. 4.1.1, p. 4-60: '2.2 m long, 16 mm diameter cylindrical graphite target' (carbon, Z = 6)" }
+target_neutron_number = { value = 6, unit = "", source = "TDR_II Sec. 4.1.1, p. 4-60 (graphite; carbon-12, N = 6)" }
+target_length = { value = 2.2, unit = "m", source = "TDR_II Sec. 4.1.1, p. 4-60 (not used by BdNMC: parents start at the origin)" }
+decay_pipe_length = { value = 194.0, unit = "m", source = "TDR_II Sec. 8.2.1, p. 8-244; LBNF_CDR3 Sec. 5.5.2 and p. 6-99 (informational)" }
+# Meson multiplicities used for DUNE's own light-dark-matter study (Pythia), the normalisation of the meson channels.
+pi0_per_pot = { value = 4.5, unit = "1/POT", source = "TDR_II Sec. 8.8.2.1, p. 8-271: 'simulations using Pythia determine that c_pi0 ~ 4.5 and c_eta ~ 0.5'" }
+eta_per_pot = { value = 0.5, unit = "1/POT", source = "TDR_II Sec. 8.8.2.1, p. 8-271 (c_eta ~ 0.5)" }
+
+[nd_lar]
+# Distance from the target to the ND. The documents do not say which point of the ND (front face or centre of
+# ND-LAr) or of the target (its start, or the start of horn 1: TDR_II p. 8-244 generates the ND flux 574 m
+# downstream of the start of horn 1). Here it is the distance along the beam axis from BdNMC's origin to the centre
+# of ND-LAr's active volume: an open question (README), worth +-2.5 m (half the active length).
+distance_from_target = { value = 574.0, unit = "m", source = "TDR_II Table 8.2 (p. 8-245): 'Distance from target 574 m'; ND_CDR p. 1-3: 'approximately 574 m'; ND_CDR p. 8-248: 'about 570 m'" }
+# Active volume: 7 x 5 modules of 1 m x 1 m x 3 m (active), 7 m wide x 3 m high x 5 m deep.
+active_width = { value = 7.0, unit = "m", source = "ND_CDR p. 2-69 and p. 2-37 (7 m horizontal, transverse to beam); TDR_II Table 8.2" }
+active_height = { value = 3.0, unit = "m", source = "ND_CDR p. 2-69 and p. 2-37 (3 m height); TDR_II Table 8.2" }
+active_length = { value = 5.0, unit = "m", source = "ND_CDR p. 2-69: '5 m deep (the direction nearly parallel to the beam)'; p. 2-37 (5 m along beam); TDR_II Table 8.2" }
+modules_transverse = { value = 7, unit = "", source = "ND_CDR p. 2-75: 'seven modules transverse to the beam direction, and five modules along it'" }
+modules_along_beam = { value = 5, unit = "", source = "ND_CDR p. 2-75" }
+module_active_size = { value = [1.0, 3.0, 1.0], unit = "m (x, y, z)", source = "ND_CDR p. 2-75: 'active volume of 1 m x 1 m x 3 m per module' (3 m is the height)" }
+total_mass = { value = 147.0, unit = "t", source = "TDR_II Table 8.2 (p. 8-245), 'Total mass 147 ton' (the active volume)" }
+fiducial_size = { value = [6.0, 2.0, 4.0], unit = "m (x, y, z)", source = "TDR_II Table 8.2 (p. 8-245): 6 m wide, 2 m high, 4 m long (50 cm from each face)" }
+fiducial_mass = { value = 67.2, unit = "t", source = "TDR_II Table 8.2 (p. 8-245); ND_CDR p. 2-37 gives 67 t, while ND_CDR p. 2-75 quotes a 50 t fiducial volume of 6 m x 2 m x 3 m" }
+cryostat_outer_size = { value = [11.4, 7.0, 8.4], unit = "m (x, y, z)", source = "ND_CDR Sec. 8.2.1, p. 8-252: approximately 11.4 m wide x 8.4 m deep x 7.0 m high, ~300 t of LAr (informational; not in the card)" }
+# The beam passes through the centre of ND-LAr's active volume when the detector is on axis.
+vertical_offset = { value = 0.0, unit = "m", source = "ND_CDR Sec. 8.1.2, p. 8-250 and Fig. 8.5: 'the neutrino beamline passes through the center of the active volume of each subdetector'" }
+
+[prism]
+# DUNE-PRISM moves ND-LAr horizontally, transverse to the beam. The direction of travel (+x or -x) is not used:
+# BdNMC's parent distributions are symmetric about the beam axis. It matters only for a simulation geometry that
+# has the hall in it (frame.gdml_offset).
+max_off_axis = { value = 30.5, unit = "m", source = "ND_CDR p. 2-39: 'can take data up to 30.5 m off-axis (~50 mrad)'; p. 1-30 and p. 4-134" }
+scan_positions = { value = [0.0, 6.0, 12.0, 18.0, 24.0], unit = "m", source = "TDR_II Sec. 8.8.2.2, p. 8-272: DUNE's LDM study, off-axis positions between 0 and 24 m in steps of 6 m" }
+
+[lar]
+density = { value = 1.396, unit = "g/cm^3", source = "PDG_LAR (specific gravity at the boiling point, 87.30 K)" }
+atomic_number = { value = 18, unit = "", source = "PDG_LAR" }
+atomic_mass = { value = 39.948, unit = "g/mol", source = "PDG_LAR" }
+# BdNMC wants integer-like nucleon counts per atom: argon-40 (99.6 % of natural argon).
+neutron_number = { value = 22, unit = "", source = "argon-40, the dominant isotope (convention: A - Z rounded from 39.948)" }
+avogadro = { value = 6.02214076e23, unit = "1/mol", source = "CODATA" }
+atomic_mass_unit = { value = 0.93149410242, unit = "GeV", source = "CODATA (u c^2); for the material `mass` key, used by BdNMC only for coherent scattering" }
+
+[frame]
+# Where ND-LAr's active-volume centre sits in the world frame of the detector simulation's geometry (GDML), in the
+# hall frame's axes. Not public as a published number; it depends on the GDML the user runs (e.g. a dunendggd
+# ND-hall geometry). The default writes vertices relative to the active-volume centre.
+gdml_offset = { value = [0.0, 0.0, 0.0], unit = "m (x, y, z)", source = "user: read it from the simulation geometry; 0 = detector-centred frame" }
+
+[generator]
+# BdNMC settings that are not DUNE numbers.
+epsilon = { value = 1e-3, unit = "", source = "FORK_CARDS (benchmark; the signal scales as epsilon^4)" }
+alpha_d = { value = 0.5, unit = "", source = "TDR_II Sec. 8.8.2.1, p. 8-271: DUNE's LDM study fixes alpha_D = 0.5" }
+mv_over_mchi = { value = 3.0, unit = "", source = "convention (m_V = 3 m_chi is the usual benchmark); not a DUNE number" }
+min_scatter_energy = { value = 0.035, unit = "GeV", source = "FORK_CARDS (generator-level cut on the total electron energy; not a DUNE threshold)" }
+max_scatter_energy = { value = 120.0, unit = "GeV", source = "FORK_CARDS" }
+brem_zmin = { value = 0.1, unit = "", source = "FORK_CARDS (proton_brem momentum-fraction window)" }
+brem_zmax = { value = 0.9, unit = "", source = "FORK_CARDS" }
+brem_ptmax = { value = 1.0, unit = "GeV", source = "FORK_CARDS" }
+years = { value = 1.0, unit = "yr", source = "user: exposure in nominal years (POT = years x beam.pot_per_year)" }
