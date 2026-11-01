@@ -9,10 +9,10 @@ edep-sim's HEPEVT reader (src/kinem/EDepSimHEPEVTKinematicsGenerator.cc, edep-si
 - one G4PrimaryVertex per header, placed at the last status-1 line's x y z t.
 
 `write_hepevt` writes exactly this layout, so the units are set to match (`length_unit="cm"`, `time_unit="ns"`),
-with the recoil electron as status 1 (tracked) and the recoil DM as status 2, PDG 18 (skipped). One mismatch is
-left: write_hepevt groups the DM of one BdNMC trial into one event, and a trial can have two accepted DM, each with
-its own interaction point. edep-sim would put both electrons at the second one. `split_vertices` therefore rewrites
-the file with one edep-sim event per interaction point and keeps the BdNMC event number in an index file.
+with the recoil electron as status 1 (tracked) and the recoil DM as status 2, PDG 18 (skipped). A BdNMC trial can
+have two accepted DM, each with its own interaction point, and edep-sim would put both electrons at the second one,
+so `write` asks write_hepevt for one event per interaction (`per_interaction=True`) and keeps the BdNMC event number
+in an index file. `split_vertices` does the same for a HEPEVT file written with events grouped.
 """
 from pathlib import Path
 
@@ -75,18 +75,21 @@ def split_vertices(src, dst, index_path=None):
 def write(res, path, gdml_offset=(0.0, 0.0, 0.0), split=True):
     """Write a `pipeline.events` (or `pipeline.finish`) result as edep-sim HEPEVT input in ND-LAr's detector frame
     (geometry.frame_from_card on the result's card, plus the simulation geometry's offset, m). Returns a dict with
-    the frame and the event counts."""
+    the frame and the event counts.
+    With `split` (the default) each interaction point is its own event and `<path>.index.csv` maps edep-sim events to
+    BdNMC events; without it the DM of one BdNMC event share an event."""
     from bdnmc_jax import output
+    res = output.collect(res)
     origin, rotation = geometry.frame_from_card(res["card"], gdml_offset)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    raw = path.with_name(path.name + ".raw") if split else path
-    n_bdnmc = output.write_hepevt(res, raw, origin=origin, rotation=rotation, dm_pdg=DM_PDG, dm_status=DM_STATUS,
-                                  **WRITE_HEPEVT_UNITS)
-    n_out = n_bdnmc
+    n_out = output.write_hepevt(res, path, origin=origin, rotation=rotation, dm_pdg=DM_PDG, dm_status=DM_STATUS,
+                                per_interaction=split, **WRITE_HEPEVT_UNITS)
+    _, event = output.accepted_events(res)
+    n_bdnmc = len(np.unique(event))
     if split:
-        _, n_out = split_vertices(raw, path)
-        raw.unlink()
+        index = path.with_name(path.name + ".index.csv")
+        index.write_text("edepsim_event,bdnmc_event\n" + "".join(f"{i},{e}\n" for i, e in enumerate(event)))
     return {"path": str(path), "bdnmc_events": int(n_bdnmc), "edepsim_events": int(n_out),
             "origin_m": np.asarray(origin).tolist(), "rotation": np.asarray(rotation).tolist(),
             "gdml_offset_m": list(map(float, gdml_offset)), "units": EDEPSIM_UNITS, "flavor": EDEPSIM_FLAVOR}

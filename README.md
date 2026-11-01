@@ -73,8 +73,8 @@ From edep-sim's source (`src/kinem/EDepSimHEPEVTKinematicsGenerator.cc`, edep-si
   `/generator/time/set free` (and `position free`) to keep BdNMC's vertex and time;
 - **found while checking:** `write_hepevt` puts the DM of one BdNMC trial in one event, and a trial often has two
   accepted DM (about 30 % of the events in a test run), each with its own interaction point. edep-sim would put
-  both electrons at the second one, so `bdnmc_dune.hepevt.split_vertices` writes one event per interaction point,
-  with an index file back to BdNMC's events;
+  both electrons at the second one, so `bdnmc_dune.hepevt.write` asks the fork's `write_hepevt` for one event
+  per interaction point (`per_interaction=True`), with an index file back to BdNMC's events;
 - **not verified:** an actual edep-sim run on these files; the detector and physics macro settings for the DUNE ND
   geometry (DUNE's ND_Production uses e.g. `/edep/hitSeparation volTPCActive -1 mm` in
   `run-edep-sim/macros/dune-nd.mac`; pass such settings as `EDEP_PRE_MAC`).

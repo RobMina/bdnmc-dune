@@ -35,6 +35,10 @@ def test_events_are_edepsim_readable_one_vertex_each(run):
         el, dm = parts
         assert el[:2] == ["1", "11"] and dm[:2] == ["2", "18"]  # only the electron is tracked
         assert el[11:15] == dm[11:15]
+    index = (d / "events.hepevt.index.csv").read_text().splitlines()
+    assert index[0] == "edepsim_event,bdnmc_event" and len(index) == len(events) + 1
+    bdnmc = [int(l.split(",")[1]) for l in index[1:]]
+    assert bdnmc == sorted(bdnmc) and len(set(bdnmc)) == info["bdnmc_events"]
 
 
 def test_vertices_are_inside_ndlar_in_the_detector_frame(run):

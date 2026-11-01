@@ -6,7 +6,7 @@ ND_Production edep-sim macros (run-edep-sim/macros/dune-nd.mac), with:
 - `position free` and `time free`: keep the vertex and time from the file. edep-sim's defaults are position `free`
   and time `fixed`, and the fixed time generator forces the vertex time (EDepSimFixedTimeGenerator::ForceTime
   returns true), so `time free` is required to keep BdNMC's times;
-- one vertex per event (`count fixed 1`): `hepevt.split_vertices` gives one interaction point per event.
+- one vertex per event (`count fixed 1`): `hepevt.write` gives one interaction point per event (per_interaction).
 
 Detector and physics settings (`/edep/...`, e.g. ND_Production's `/edep/hitSeparation volTPCActive -1 mm` and
 thresholds) depend on the geometry and go in a separate macro run before this one; that macro ends with
