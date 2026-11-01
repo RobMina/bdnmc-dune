@@ -55,11 +55,12 @@ From: almalinux:9
     # ---------------------------------------------------------------- stage B: ROOT, Geant4, edep-sim
     mkdir -p /opt/src && cd /opt/src
     # ROOT (C++17, like Geant4; edep-sim checks that ROOT and its own C++ standard agree). PyROOT against the
-    # venv's Python so edep-sim's ROOT files can be read from the same interpreter.
+    # venv's Python so edep-sim's ROOT files can be read from the same interpreter. No OpenGL (a batch image): with
+    # opengl off, builtin GLEW must stay off too, since its build requires the OpenGL libraries.
     curl -fsSL "https://root.cern/download/root_v{{ ROOT_VERSION }}.source.tar.gz" | tar xz
     cmake -S "root-{{ ROOT_VERSION }}" -B root-build -DCMAKE_INSTALL_PREFIX=/opt/root -DCMAKE_CXX_STANDARD=17 \
         -Dgdml=ON -Dopengl=OFF -Dx11=ON -Dpyroot=ON -DPython3_EXECUTABLE=/opt/venv/bin/python \
-        -Dbuiltin_glew=ON -Dbuiltin_gsl=ON -Dbuiltin_tbb=ON -Droofit=OFF -Dtmva=OFF -Dxrootd=OFF
+        -Dbuiltin_gsl=ON -Dbuiltin_tbb=ON -Droofit=OFF -Dtmva=OFF -Dxrootd=OFF
     cmake --build root-build -j"{{ JOBS }}" --target install
     # Geant4 with GDML (required by edep-sim) and its data sets (several GB; downloaded at build time).
     curl -fsSL "https://gitlab.cern.ch/geant4/geant4/-/archive/v{{ GEANT4_VERSION }}/geant4-v{{ GEANT4_VERSION }}.tar.gz" | tar xz
@@ -72,7 +73,8 @@ From: almalinux:9
     git -C edep-sim rev-parse HEAD > /opt/EDEPSIM_COMMIT
     . /opt/root/bin/thisroot.sh
     . /opt/geant4/bin/geant4.sh
-    cmake -S edep-sim -B edep-build -DCMAKE_INSTALL_PREFIX=/opt/edep-sim -DCMAKE_CXX_STANDARD=17
+    # no edep-disp event display: it needs ROOT's Eve and OpenGL, which this batch image does not build
+    cmake -S edep-sim -B edep-build -DCMAKE_INSTALL_PREFIX=/opt/edep-sim -DCMAKE_CXX_STANDARD=17 -DEDEPSIM_DISPLAY=OFF
     cmake --build edep-build -j"{{ JOBS }}" --target install
     cd / && rm -rf /opt/src
 

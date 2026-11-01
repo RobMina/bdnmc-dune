@@ -5,7 +5,7 @@ One AlmaLinux 9 image holds both stages of a job: BdNMC's JAX port (with `bdnmc_
 
 | Recipe | Contents | Status |
 |---|---|---|
-| `bdnmc-dune.def` | AL9 (glibc 2.34); Python 3.12 venv with `jax[cuda12]==0.12.0.1`, numpy, h5py, `bdnmc_jax` (fork `RobMina/BdNMC`, branch `gpu-port`) and `bdnmc_dune` (this checkout); ROOT 6.36.04, Geant4 11.4.0 (GDML, data sets), edep-sim 4.4.0, built from source | written, not built |
+| `bdnmc-dune.def` | AL9 (glibc 2.34); Python 3.12 venv with `jax[cuda12]==0.12.0.1`, numpy, h5py, `bdnmc_jax` (fork `RobMina/BdNMC`, branch `gpu-port`) and `bdnmc_dune` (this checkout); ROOT 6.36.04 (no OpenGL), Geant4 11.4.0 (GDML, data sets), edep-sim 4.4.0 (no event display), built from source | written, not built |
 
 ## Build
 
