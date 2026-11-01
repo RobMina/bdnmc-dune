@@ -23,6 +23,7 @@ From: almalinux:9
     ROOT_VERSION=6.36.04
     GEANT4_VERSION=11.4.0
     EDEPSIM_REF=4.4.0
+    HEPEP_REF=5327d2d9247f4a1879461cec6a6d4046d5b88134
     JOBS=8
 
 %files
@@ -48,6 +49,7 @@ From: almalinux:9
     git -C /opt/BdNMC checkout "{{ BDNMC_REF }}"
     git -C /opt/BdNMC rev-parse HEAD > /opt/BdNMC/COMMIT
     /opt/venv/bin/pip install --no-cache-dir --no-deps /opt/BdNMC/gpu
+    /opt/venv/bin/pip install --no-cache-dir --no-deps "hep-endpoints @ git+https://github.com/RobMina/hep-endpoints.git@{{ HEPEP_REF }}"
     /opt/venv/bin/pip install --no-cache-dir --no-deps /opt/bdnmc-dune
 
     # ---------------------------------------------------------------- stage B: ROOT, Geant4, edep-sim

@@ -21,9 +21,10 @@ Build arguments (defaults in the recipe's `%arguments`), for example:
 apptainer build --build-arg BDNMC_REF=<commit> --build-arg JOBS=32 bdnmc-dune.sif containers/bdnmc-dune.def
 ```
 
-- `BDNMC_REF`: fork commit or branch (needs `output.write_hepevt`, commit `3dd00be` or later); recorded in
+- `BDNMC_REF`: fork commit or branch (needs `output.write_hepevt` with `per_interaction`, commit `89ccf7a` or later); recorded in
   `/opt/BdNMC/COMMIT`.
 - `EDEPSIM_REF`: edep-sim tag or commit; recorded in `/opt/EDEPSIM_COMMIT`.
+- `HEPEP_REF`: the hep-endpoints commit (submission; standard-library only), the one `pyproject.toml` pins.
 - `ROOT_VERSION`, `GEANT4_VERSION`: edep-sim's README says it was tested with Geant4 11.4 and ROOT 6.36.
 - `PYTHON`: the AL9 Python for the venv (`python3.12`, from AppStream). If pip finds no `jax==0.12.0.1` wheel for it,
   use a newer Python (the fork's tests ran on 3.14).
