@@ -8,8 +8,10 @@ version = "0.1.0"
 description = "BdNMC light-dark-matter event generation for the DUNE Near Detector: ND-LAr cards and frame, edep-sim HEPEVT input, container and job recipes"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-# bdnmc-jax: the JAX port in RobMina/BdNMC (branch gpu-port, subdirectory gpu; needs output.write_hepevt, 3dd00be)
-dependencies = ["numpy", "bdnmc-jax @ git+https://github.com/RobMina/BdNMC.git@gpu-port#subdirectory=gpu"]
+# bdnmc-jax: the JAX port in RobMina/BdNMC (branch gpu-port, subdirectory gpu; needs output.write_hepevt with per_interaction, 89ccf7a)
+# hep-endpoints: job submission (RobMina/hep-endpoints, standard-library only), pinned to a commit
+dependencies = ["numpy", "bdnmc-jax @ git+https://github.com/RobMina/BdNMC.git@gpu-port#subdirectory=gpu",
+                "hep-endpoints @ git+https://github.com/RobMina/hep-endpoints.git@5327d2d9247f4a1879461cec6a6d4046d5b88134"]
 
 [project.optional-dependencies]
 test = ["pytest", "h5py"]

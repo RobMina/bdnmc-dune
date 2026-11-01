@@ -56,8 +56,9 @@ First version (2026-10-31).
   job spec.
 - **Written, not run:** the AL9 image (`containers/bdnmc-dune.def`), the edep-sim stage of the job, the edep-sim
   macro (checked against edep-sim's source, not run in edep-sim).
-- **Placeholders:** the hep-endpoints submission (`bdnmc_dune.jobspec.submit`, marked integration point; raises);
-  the in-process mode (design above); detectors other than ND-LAr; real LBNF meson lists.
+- **Wired, not run at a site:** submission through hep-endpoints (`jobspec --submit`, `job status/fetch/cancel`);
+  tested offline with its rendered Slurm job file and a local stand-in endpoint.
+- **Placeholders:** the in-process mode (design above); detectors other than ND-LAr; real LBNF meson lists.
 
 ## The edep-sim input
 
@@ -100,9 +101,24 @@ One whole job (generation and edep-sim), in the image:
 IMAGE=bdnmc-dune.sif GPU=1 CARD=cards/<card>.dat GEOMETRY=<nd.gdml> OUTDIR=out bash jobs/run_bdnmc_edepsim.sh
 ```
 
-For hep-endpoints, `python -m bdnmc_dune jobspec <card> --handle <name> --geometry <gdml at the site> --image <sif
-at the site> --gpus 1 --script job.sh` prints the job (resources and settings) and writes a self-contained
-`job.sh` with the card embedded; `bdnmc_dune.jobspec.submit` is where hependpoints will submit it.
+Through hep-endpoints (RobMina/hep-endpoints; the site settings are its `HEPEP_*` variables, see its README):
+
+```bash
+python -m bdnmc_dune jobspec <card> --handle <name> --geometry <gdml at the site> --image <sif at the site> --gpus 1 --submit slurm_ssh
+```
+
+```bash
+python -m bdnmc_dune job status <name> --endpoint slurm_ssh
+```
+
+```bash
+python -m bdnmc_dune job fetch <name> --endpoint slurm_ssh --dest results
+```
+
+The job writes to the endpoint's output directory (`$BDNMC_OUT`), which `fetch` copies to `results/<name>/`;
+resubmitting the same job under the same handle returns the same record, and a changed one is refused.
+`--script job.sh` (without `--submit`) writes the self-contained job script instead, for a site hep-endpoints does
+not cover.
 
 Overrides: `--config my.toml` with, for example, `[frame] gdml_offset = [0.0, -2.68, 13.0]` or
 `[beam] slope_at_nd = 5.8`. Precision: float32 by default (the port's default); `BDNMC_JAX_PRECISION=float64` (or
@@ -136,8 +152,8 @@ arXiv:2002.03005; LBNF CDR Vol. 3 = arXiv:1601.05823; PDG liquid argon.
 | `bdnmc_dune/geometry.py` | beam and hall frames, ND-LAr's placement and Euler angles, the detector frame from a card |
 | `bdnmc_dune/cards.py` | card generator and mass scans (pi0, eta, brem; off-axis positions) |
 | `bdnmc_dune/hepevt.py`, `edepsim.py` | edep-sim HEPEVT input via `write_hepevt`, one vertex per event; the edep-sim macro |
-| `bdnmc_dune/jobspec.py` | the job for hep-endpoints (script + resources); the integration point |
-| `bdnmc_dune/cli.py` | `python -m bdnmc_dune {cards,run,frame,macro,jobspec}` |
+| `bdnmc_dune/jobspec.py` | the job for hep-endpoints (script + resources), its endpoint and submission |
+| `bdnmc_dune/cli.py` | `python -m bdnmc_dune {cards,run,frame,macro,jobspec,job}` |
 | `bdnmc_dune/data/run_bdnmc_edepsim.sh` (linked from `jobs/`) | the two-stage job script |
 | `containers/` | the AL9 Apptainer recipe and build instructions |
 | `tests/` | pytest, laptop CPU only |

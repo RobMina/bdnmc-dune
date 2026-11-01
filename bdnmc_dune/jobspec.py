@@ -1,13 +1,13 @@
-"""A bdnmc-dune job as a self-contained script plus resources, for the experiment-neutral `hep-endpoints` package.
+"""A bdnmc-dune job as a self-contained script plus resources, submitted through the experiment-neutral
+`hep-endpoints` package (RobMina/hep-endpoints, import name `hependpoints`).
 
-hep-endpoints (import name `hependpoints`) moves a job script to a site, runs it and brings its output directory
-back (Slurm over SSH, Fermilab EAF, FNAL grid through jobsub). This module builds what it needs:
+hep-endpoints moves a job script to a site, runs it and brings its output directory back (Slurm over SSH, Fermilab
+EAF, FNAL grid through jobsub); the site settings are its `HEPEP_*` variables or keyword arguments. This module:
 - `JobSpec.script()`: jobs/run_bdnmc_edepsim.sh with its inputs set and the card embedded, so the job needs only
-  the image and the geometry at the site;
-- `JobSpec.resources()`: cores, memory, GPUs, wall time, with the field names of hependpoints.Resources as read
-  from its development tree on 2026-10-31.
-
-The submission itself is the integration point below (`submit`): it is not implemented here.
+  the image and the geometry at the site; by default it writes to the endpoint's output directory (`$BDNMC_OUT`);
+- `JobSpec.resources()`: cores, memory, GPUs, wall time (the fields of hependpoints.Resources);
+- `endpoint(name, **kw)`, `submit(spec, endpoint)`: an endpoint with bdnmc-dune's job environment (variables
+  `BDNMC_*`, job names `bdnmcdune_<handle>`), and the submission. Status, fetch and cancel are the endpoint's own.
 """
 from dataclasses import asdict, dataclass, field
 from importlib import resources as ilr
@@ -17,6 +17,8 @@ import re
 import shlex
 
 HANDLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+VAR_PREFIX, JOB_PREFIX = "BDNMC", "bdnmcdune"
+OUT_VAR = f"{VAR_PREFIX}_OUT"
 
 
 @dataclass
@@ -33,7 +35,7 @@ class JobSpec:
     cores: int = 1
     mem_gb: int = 8
     minutes: int = 120
-    outdir: str = "out"
+    outdir: str = ""  # "" = the endpoint's output directory ($BDNMC_OUT), or ./out outside an endpoint
     gdml_offset: tuple = (0.0, 0.0, 0.0)
     edep_pre_mac: str = ""
     skip_edepsim: bool = False
@@ -51,7 +53,7 @@ class JobSpec:
 
     def env(self):
         """The job script's inputs (jobs/run_bdnmc_edepsim.sh)."""
-        e = {"OUTDIR": self.outdir, "CARD": f"{self.outdir}/card.dat", "TRIALS": str(int(self.trials)),
+        e = {"TRIALS": str(int(self.trials)),
              "BATCH": str(int(self.batch)), "PRECISION": self.precision, "GPU": "1" if self.gpus else "0",
              "IMAGE": self.image, "GEOMETRY": self.geometry, "EDEP_PRE_MAC": self.edep_pre_mac,
              "GDML_OFFSET": ",".join(repr(float(v)) for v in self.gdml_offset),
@@ -63,9 +65,10 @@ class JobSpec:
         body = body.split("\n", 1)[1]  # drop the shebang; the prelude has its own
         env = self.env()
         prelude = ["#!/usr/bin/env bash", f"# bdnmc-dune job {self.handle}", "set -euo pipefail"]
+        out = shlex.quote(self.outdir) if self.outdir else f'"${{{OUT_VAR}:-$PWD/out}}"'
+        prelude += [f"export OUTDIR={out}", 'export CARD="$OUTDIR/card.dat"']
         prelude += [f"export {k}={shlex.quote(v)}" for k, v in env.items()]
-        prelude += [f"mkdir -p {shlex.quote(self.outdir)}",
-                    f"cat > {shlex.quote(env['CARD'])} <<'BDNMC_CARD_EOF'", self.card_text.rstrip("\n"),
+        prelude += ['mkdir -p "$OUTDIR"', "cat > \"$CARD\" <<'BDNMC_CARD_EOF'", self.card_text.rstrip("\n"),
                     "BDNMC_CARD_EOF"]
         return "\n".join(prelude) + "\n" + body
 
@@ -82,21 +85,25 @@ class JobSpec:
         return cls(handle=handle, card_text=Path(card_path).read_text(), **kw)
 
 
-def submit(spec, endpoint, **endpoint_kw):
-    """HEP-ENDPOINTS INTEGRATION POINT (not implemented here).
+def environment():
+    """bdnmc-dune's hependpoints.JobEnvironment: jobs see $BDNMC_JOB_DIR and $BDNMC_OUT; job names bdnmcdune_<handle>."""
+    from hependpoints.environment import JobEnvironment
+    return JobEnvironment(var_prefix=VAR_PREFIX, job_prefix=JOB_PREFIX)
 
-    Intended call, once hependpoints is released (its interface as read from the development tree on
-    2026-10-31: `hependpoints.get(name, **kw)` returns an endpoint with `submit(handle, script, resources)`,
-    `status(handle)`, `fetch(handle, dest)` and `cancel(handle)`):
 
-        import hependpoints
-        ep = hependpoints.get(endpoint, **endpoint_kw)          # "slurm_ssh", "eaf", "jobsub", ...
-        return ep.submit(spec.handle, spec.script(), hependpoints.Resources(**spec.resources()))
+def endpoint(name, **kw):
+    """A hependpoints endpoint ("slurm_ssh", "eaf", "jobsub" or one an experiment registered) with bdnmc-dune's job
+    environment; its site settings come from `kw` or its HEPEP_* variables."""
+    import hependpoints
+    kw.setdefault("environment", environment())
+    return hependpoints.get(name, **kw)
 
-    The image and the geometry must already be at the site (paths in the spec); the endpoint brings `spec.outdir`
-    back. Until the package is released this raises, so that no job is sent through an interface nobody tested.
-    """
-    raise NotImplementedError(
-        "submission goes through hep-endpoints (hependpoints), which is not wired in yet: "
-        "write the job with `python -m bdnmc_dune jobspec ... --script job.sh` and run it, or wire "
-        "bdnmc_dune.jobspec.submit to hependpoints.get(endpoint).submit(handle, script, Resources(...))")
+
+def submit(spec, ep, **endpoint_kw):
+    """Submit `spec` to `ep` (an endpoint, or a name for `endpoint`). Idempotent per handle: resubmitting the same
+    spec returns the same record; a changed spec under the same handle is refused. The image and the geometry must
+    already be at the site (paths in the spec); the endpoint's fetch brings $BDNMC_OUT back."""
+    import hependpoints
+    if isinstance(ep, str):
+        ep = endpoint(ep, **endpoint_kw)
+    return ep.submit(spec.handle, spec.script(), hependpoints.Resources(**spec.resources()))

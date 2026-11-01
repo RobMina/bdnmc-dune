@@ -5,7 +5,8 @@
            edep-sim macro)
   frame    print the detector frame (origin, rotation) of a card or of an off-axis position
   macro    print or write the edep-sim generator macro for a HEPEVT file
-  jobspec  build the hep-endpoints job (self-contained script + resources) for one card
+  jobspec  build the hep-endpoints job (self-contained script + resources) for one card; --submit ENDPOINT sends it
+  job      status, fetch or cancel a submitted job
 """
 import argparse
 import hashlib
@@ -102,6 +103,22 @@ def cmd_jobspec(a):
         Path(a.script).write_text(spec.script())
         Path(a.script).chmod(0o755)
     print(spec.to_json())
+    if a.submit:
+        rec = jobspec.submit(spec, a.submit)
+        print(f"submitted {spec.handle} to {a.submit}: job {rec.job_id}")
+
+
+def cmd_job(a):
+    from . import jobspec
+    ep = jobspec.endpoint(a.endpoint)
+    if a.action == "status":
+        st = ep.status(a.handle)
+        print(f"{a.handle}: {st.state} {st.message}".rstrip())
+    elif a.action == "fetch":
+        for f in ep.fetch(a.handle, a.dest):
+            print(f)
+    else:
+        print(ep.cancel(a.handle))
 
 
 def main(argv=None):
@@ -166,12 +183,21 @@ def main(argv=None):
     p.add_argument("--cores", type=int, default=1)
     p.add_argument("--mem-gb", type=int, default=8)
     p.add_argument("--minutes", type=int, default=120)
-    p.add_argument("--outdir", default="out")
+    p.add_argument("--outdir", default="", help="output directory in the job (default: the endpoint's, $BDNMC_OUT)")
     p.add_argument("--gdml-offset", type=_offset)
     p.add_argument("--edep-pre-mac", default="")
     p.add_argument("--skip-edepsim", action="store_true")
     p.add_argument("--script", type=Path, help="also write the rendered job script here")
+    p.add_argument("--submit", metavar="ENDPOINT", help="submit through hep-endpoints (slurm_ssh, eaf, jobsub; site "
+                   "settings from the HEPEP_* variables)")
     p.set_defaults(func=cmd_jobspec)
+
+    p = sub.add_parser("job", help="status, fetch or cancel a submitted job (hep-endpoints)")
+    p.add_argument("action", choices=("status", "fetch", "cancel"))
+    p.add_argument("handle")
+    p.add_argument("--endpoint", required=True)
+    p.add_argument("--dest", type=Path, default=Path("."), help="fetch: copy the job's output under DEST/<handle>/")
+    p.set_defaults(func=cmd_job)
 
     a = ap.parse_args(argv)
     a.func(a)
