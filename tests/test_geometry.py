@@ -62,3 +62,20 @@ def test_frame_from_card_matches_the_config(tmp_path, x, g):
     R = geometry.beam_to_hall(CFG.slope_rad)
     for i in range(3):
         np.testing.assert_allclose(r1 @ (centre + R[i] - o1) - np.asarray(g), np.eye(3)[i], atol=1e-8)
+
+
+def test_test_geometry_is_the_active_volume_in_air(tmp_path):
+    import xml.etree.ElementTree as ET
+    from bdnmc_dune import cli, testgeom
+    out = tmp_path / "box.gdml"
+    cli.main(["testgeom", "--out", str(out)])
+    root = ET.parse(out).getroot()
+    boxes = {b.get("name"): [float(b.get(k)) for k in "xyz"] for b in root.iter("box")}
+    assert boxes["LArActive_box"] == [7.0, 3.0, 5.0]
+    vol = {v.get("name"): v for v in root.iter("volume")}
+    assert vol["volLArActive"].find("materialref").get("ref") == "G4_lAr"
+    aux = vol["volLArActive"].find("auxiliary")
+    assert (aux.get("auxtype"), aux.get("auxvalue")) == ("SegmentDetector", testgeom.SD_NAME)
+    assert root.find("setup/world").get("ref") == "volWorld"
+    with pytest.raises(ValueError):
+        testgeom.box_gdml(CFG, world_m=(5.0, 20.0, 20.0))

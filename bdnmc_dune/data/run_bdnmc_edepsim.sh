@@ -15,6 +15,7 @@
 #   GDML_OFFSET   x,y,z (m) of ND-LAr's active-volume centre in the GDML world frame           default: from the config
 #   EDEP_PRE_MAC  edep-sim macro with the /edep/ detector and physics settings, ending in
 #                 /edep/update (empty: edep-sim -u, defaults)                                  default: empty
+#   EDEP_EVENTS   simulate at most this many edep-sim events (the first ones of the file); 0: all   default: 0
 #   SKIP_EDEPSIM  1: stop after the HEPEVT file                                                default: 0
 #
 # Outputs in OUTDIR: events.hepevt (+ .index.csv), summary.json, generator.mac, events.edepsim.root, logs.
@@ -33,6 +34,7 @@ GPU=${GPU:-0}
 IMAGE=${IMAGE:-}
 GDML_OFFSET=${GDML_OFFSET:-}
 EDEP_PRE_MAC=${EDEP_PRE_MAC:-}
+EDEP_EVENTS=${EDEP_EVENTS:-0}
 SKIP_EDEPSIM=${SKIP_EDEPSIM:-0}
 mkdir -p "$OUTDIR"
 
@@ -41,7 +43,11 @@ nv=()
 
 in_image() {
     if [[ -n "$IMAGE" && -z "${APPTAINER_CONTAINER:-}" ]]; then
-        apptainer exec ${nv[@]+"${nv[@]}"} --env "BDNMC_JAX_PRECISION=$PRECISION" "$IMAGE" "$@"
+        # The image's environment is set again in bash: Apptainer applies %environment with its own shell, which
+        # cannot parse ROOT's thisroot.sh, so images built before that was fixed lack the ROOT and Geant4 libraries.
+        apptainer exec ${nv[@]+"${nv[@]}"} --env "BDNMC_JAX_PRECISION=$PRECISION" "$IMAGE" \
+            bash -c 'if [[ -f /opt/environment.sh ]]; then . /opt/environment.sh >/dev/null 2>&1; fi; exec "$@"' \
+            bash "$@"
     else
         BDNMC_JAX_PRECISION=$PRECISION "$@"
     fi
@@ -63,6 +69,9 @@ n=$(in_image python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["h
 if [[ "$n" == 0 ]]; then
     echo "no accepted events: edep-sim not run" | tee "$OUTDIR/edepsim.log"
     exit 0
+fi
+if (( EDEP_EVENTS > 0 && EDEP_EVENTS < n )); then
+    n=$EDEP_EVENTS
 fi
 
 # Stage 2: edep-sim (-C validates the geometry; -u applies /edep/update when no detector macro is given).

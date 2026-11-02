@@ -78,9 +78,10 @@ def test_slurm_job_file_has_the_dune_environment(tmp_path):
     from hependpoints import Resources
     spec = jobspec.JobSpec("ndlar-pi0-m005", "seed 3\n", geometry="/site/nd.gdml", gpus=1, gpu_type="a100")
     ep = jobspec.endpoint("slurm_ssh", host="login.example", account="acct", workdir="/scratch/jobs",
-                          state_dir=tmp_path / "state")
+                          state_dir=tmp_path / "state", preamble="module load apptainer")
     body = ep.body(spec.handle, spec.script(), Resources(**spec.resources()))
     assert "#SBATCH -J bdnmcdune_ndlar-pi0-m005" in body and "#SBATCH --gres=gpu:a100:1" in body
+    assert body.index("module load apptainer\n") < body.index("# bdnmc-dune job ndlar-pi0-m005")
     assert "export BDNMC_JOB_DIR=/scratch/jobs/ndlar-pi0-m005 BDNMC_OUT=/scratch/jobs/ndlar-pi0-m005/out" in body
     f = tmp_path / "job.sh"
     f.write_text(body)

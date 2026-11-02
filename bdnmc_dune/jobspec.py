@@ -38,6 +38,7 @@ class JobSpec:
     outdir: str = ""  # "" = the endpoint's output directory ($BDNMC_OUT), or ./out outside an endpoint
     gdml_offset: tuple = (0.0, 0.0, 0.0)
     edep_pre_mac: str = ""
+    edep_events: int = 0  # simulate at most this many edep-sim events (0: all)
     skip_edepsim: bool = False
     extra_env: dict = field(default_factory=dict)
 
@@ -57,7 +58,7 @@ class JobSpec:
              "BATCH": str(int(self.batch)), "PRECISION": self.precision, "GPU": "1" if self.gpus else "0",
              "IMAGE": self.image, "GEOMETRY": self.geometry, "EDEP_PRE_MAC": self.edep_pre_mac,
              "GDML_OFFSET": ",".join(repr(float(v)) for v in self.gdml_offset),
-             "SKIP_EDEPSIM": "1" if self.skip_edepsim else "0"}
+             "EDEP_EVENTS": str(int(self.edep_events)), "SKIP_EDEPSIM": "1" if self.skip_edepsim else "0"}
         return e | {k: str(v) for k, v in self.extra_env.items()}
 
     def script(self):
@@ -85,17 +86,18 @@ class JobSpec:
         return cls(handle=handle, card_text=Path(card_path).read_text(), **kw)
 
 
-def environment():
-    """bdnmc-dune's hependpoints.JobEnvironment: jobs see $BDNMC_JOB_DIR and $BDNMC_OUT; job names bdnmcdune_<handle>."""
+def environment(preamble=""):
+    """bdnmc-dune's hependpoints.JobEnvironment: jobs see $BDNMC_JOB_DIR and $BDNMC_OUT; job names bdnmcdune_<handle>.
+    `preamble`: the site's shell setup before the job script (e.g. "module load apptainer")."""
     from hependpoints.environment import JobEnvironment
-    return JobEnvironment(var_prefix=VAR_PREFIX, job_prefix=JOB_PREFIX)
+    return JobEnvironment(var_prefix=VAR_PREFIX, job_prefix=JOB_PREFIX, preamble=preamble)
 
 
-def endpoint(name, **kw):
+def endpoint(name, preamble="", **kw):
     """A hependpoints endpoint ("slurm_ssh", "eaf", "jobsub" or one an experiment registered) with bdnmc-dune's job
-    environment; its site settings come from `kw` or its HEPEP_* variables."""
+    environment and the site's `preamble`; its site settings come from `kw` or its HEPEP_* variables."""
     import hependpoints
-    kw.setdefault("environment", environment())
+    kw.setdefault("environment", environment(preamble))
     return hependpoints.get(name, **kw)
 
 

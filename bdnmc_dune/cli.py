@@ -7,6 +7,7 @@
   macro    print or write the edep-sim generator macro for a HEPEVT file
   jobspec  build the hep-endpoints job (self-contained script + resources) for one card; --submit ENDPOINT sends it
   job      status, fetch or cancel a submitted job
+  testgeom write a minimal GDML (ND-LAr's active volume as one argon box) for a smoke test of edep-sim
 """
 import argparse
 import hashlib
@@ -97,15 +98,22 @@ def cmd_jobspec(a):
     spec = jobspec.JobSpec.from_card(
         a.handle, a.card, geometry=a.geometry, image=a.image, trials=a.trials, batch=a.batch,
         precision=a.precision, gpus=a.gpus, gpu_type=a.gpu_type, cores=a.cores, mem_gb=a.mem_gb,
-        minutes=a.minutes, outdir=a.outdir, edep_pre_mac=a.edep_pre_mac, skip_edepsim=a.skip_edepsim,
+        minutes=a.minutes, outdir=a.outdir, edep_pre_mac=a.edep_pre_mac, edep_events=a.edep_events,
+        skip_edepsim=a.skip_edepsim,
         gdml_offset=tuple(a.gdml_offset if a.gdml_offset is not None else cfg.value("frame.gdml_offset")))
     if a.script:
         Path(a.script).write_text(spec.script())
         Path(a.script).chmod(0o755)
     print(spec.to_json())
     if a.submit:
-        rec = jobspec.submit(spec, a.submit)
+        rec = jobspec.submit(spec, a.submit, preamble=a.preamble.replace("\\n", "\n"))
         print(f"submitted {spec.handle} to {a.submit}: job {rec.job_id}")
+
+
+def cmd_testgeom(a):
+    from . import config, testgeom
+    Path(a.out).write_text(testgeom.box_gdml(config.load(*a.config)))
+    print(f"wrote {a.out}")
 
 
 def cmd_job(a):
@@ -186,11 +194,19 @@ def main(argv=None):
     p.add_argument("--outdir", default="", help="output directory in the job (default: the endpoint's, $BDNMC_OUT)")
     p.add_argument("--gdml-offset", type=_offset)
     p.add_argument("--edep-pre-mac", default="")
+    p.add_argument("--edep-events", type=int, default=0, help="simulate at most N edep-sim events (0: all)")
     p.add_argument("--skip-edepsim", action="store_true")
     p.add_argument("--script", type=Path, help="also write the rendered job script here")
     p.add_argument("--submit", metavar="ENDPOINT", help="submit through hep-endpoints (slurm_ssh, eaf, jobsub; site "
                    "settings from the HEPEP_* variables)")
+    p.add_argument("--preamble", default="", help="shell text the site needs before the job, e.g. 'module load "
+                   "apptainer' ('\\n' separates lines)")
     p.set_defaults(func=cmd_jobspec)
+
+    p = sub.add_parser("testgeom", help="minimal GDML for a smoke test: ND-LAr's active volume as one argon box")
+    common(p)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=cmd_testgeom)
 
     p = sub.add_parser("job", help="status, fetch or cancel a submitted job (hep-endpoints)")
     p.add_argument("action", choices=("status", "fetch", "cancel"))

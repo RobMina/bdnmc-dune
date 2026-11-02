@@ -17,7 +17,7 @@ port needs glibc >= 2.27; AL9 has 2.34).
 
 | Mode | Generation | Simulation | Status |
 |---|---|---|---|
-| **JAX port, same image** (`jobs/run_bdnmc_edepsim.sh`, `containers/bdnmc-dune.def`) | `bdnmc_jax.pipeline.events` on a GPU (`--nv`) or CPU; `bdnmc_jax.output.write_hepevt` in ND-LAr's frame | edep-sim's HEPEVT kinematics generator in the same image, same job | implemented and tested up to the HEPEVT file; image and edep-sim stage written, not run |
+| **JAX port, same image** (`jobs/run_bdnmc_edepsim.sh`, `containers/bdnmc-dune.def`) | `bdnmc_jax.pipeline.events` on a GPU (`--nv`) or CPU; `bdnmc_jax.output.write_hepevt` in ND-LAr's frame | edep-sim's HEPEVT kinematics generator in the same image, same job | implemented; run end to end on a GPU node (Status) |
 | **stock libBdNMC in process** | stock BdNMC from the fork's `shared_library` branch (`libBdNMC`, C API `src/BdNMC_capi.h`) | an edep-sim external kinematics generator (`/generator/kinematics/external/loadGenerator <lib> CreateKinematicsGenerator`, a subclass of `EDepSim::VKinematicsGenerator`, as in edep-sim's `examples/ExternalKinematics`) that calls `bdnmc_configure(card)` / `bdnmc_run` and turns each event's `electron` into a `G4PrimaryVertex` in the same frame (`bdnmc_dune.geometry`) | design only: not written |
 
 The JAX mode gives the GPU port's speed (and its mass scans without recompilation); the in-process mode needs no
@@ -54,10 +54,15 @@ First version (2026-10-31).
   the detector frame; the HEPEVT writer through `write_hepevt` with edep-sim's units; a few 2^16-trial blocks end
   to end, every vertex inside ND-LAr's active volume in the detector frame; the job script's control flow; the
   job spec.
-- **Written, not run:** the AL9 image (`containers/bdnmc-dune.def`), the edep-sim stage of the job, the edep-sim
-  macro (checked against edep-sim's source, not run in edep-sim).
-- **Wired, not run at a site:** submission through hep-endpoints (`jobspec --submit`, `job status/fetch/cancel`);
-  tested offline with its rendered Slurm job file and a local stand-in endpoint.
+- **Run end to end (2026-11-01):** one job submitted through hep-endpoints (`slurm_ssh`) to a Slurm cluster, on
+  one NVIDIA V100 (32 GB) with 4 CPU cores, in the AL9 image (Geant4 11.4.0, edep-sim `a3abbcf`), with the
+  test geometry (`testgeom`: ND-LAr's active volume as one argon box). The pi0 card at m_chi = 10 MeV, on axis:
+  2^24 trials in 20.6 s (float32), 602037 edep-sim events; edep-sim on the first 2000 in 191 s. Checked with
+  `jobs/check_edepsim.py`: every primary vertex equals its HEPEVT vertex to 3e-14 cm, the times are equal, the
+  electron momenta agree to 1e-9 (relative); the median electron deposits 99.1 % of its kinetic energy in the
+  box (10 % quantile 47 %: showers leaving the bare box). edep-sim's default output keeps every trajectory,
+  about 0.44 MB per event at these energies.
+- **Not yet run:** a DUNE ND geometry (with its `EDEP_PRE_MAC` settings and `frame.gdml_offset`).
 - **Placeholders:** the in-process mode (design above); detectors other than ND-LAr; real LBNF meson lists.
 
 ## The edep-sim input
@@ -76,8 +81,8 @@ From edep-sim's source (`src/kinem/EDepSimHEPEVTKinematicsGenerator.cc`, edep-si
   accepted DM (about 30 % of the events in a test run), each with its own interaction point. edep-sim would put
   both electrons at the second one, so `bdnmc_dune.hepevt.write` asks the fork's `write_hepevt` for one event
   per interaction point (`per_interaction=True`), with an index file back to BdNMC's events;
-- **not verified:** an actual edep-sim run on these files; the detector and physics macro settings for the DUNE ND
-  geometry (DUNE's ND_Production uses e.g. `/edep/hitSeparation volTPCActive -1 mm` in
+- **verified in edep-sim** (Status): vertices, times and momenta arrive unchanged, one primary per event;
+- **not verified:** the detector and physics macro settings for the DUNE ND geometry (DUNE's ND_Production uses e.g. `/edep/hitSeparation volTPCActive -1 mm` in
   `run-edep-sim/macros/dune-nd.mac`; pass such settings as `EDEP_PRE_MAC`).
 
 Vertex times are BdNMC's: seconds since production at the target, written in ns (about 1.9 us at 574 m).
@@ -105,6 +110,15 @@ Through hep-endpoints (RobMina/hep-endpoints; the site settings are its `HEPEP_*
 
 ```bash
 python -m bdnmc_dune jobspec <card> --handle <name> --geometry <gdml at the site> --image <sif at the site> --gpus 1 --submit slurm_ssh
+```
+
+`--preamble` adds the site's shell setup before the job (for example `--preamble "module load apptainer"` where
+Apptainer is a module); `--edep-events N` simulates only the first N events of the HEPEVT file. Without a DUNE
+geometry, `python -m bdnmc_dune testgeom --out box.gdml` writes a smoke-test GDML (ND-LAr's active volume as one
+argon box, a segment detector, in the detector-centred frame). After the job, inside the image:
+
+```bash
+python3 jobs/check_edepsim.py <out>/events.edepsim.root <out>/events.hepevt
 ```
 
 ```bash
@@ -154,7 +168,9 @@ arXiv:2002.03005; LBNF CDR Vol. 3 = arXiv:1601.05823; PDG liquid argon.
 | `bdnmc_dune/hepevt.py`, `edepsim.py` | edep-sim HEPEVT input via `write_hepevt`, one vertex per event; the edep-sim macro |
 | `bdnmc_dune/jobspec.py` | the job for hep-endpoints (script + resources), its endpoint and submission |
 | `bdnmc_dune/cli.py` | `python -m bdnmc_dune {cards,run,frame,macro,jobspec,job}` |
+| `bdnmc_dune/testgeom.py` | the smoke-test GDML (one argon box) |
 | `bdnmc_dune/data/run_bdnmc_edepsim.sh` (linked from `jobs/`) | the two-stage job script |
+| `jobs/check_edepsim.py` | edep-sim output against its HEPEVT input (vertices, times, momenta, deposits) |
 | `containers/` | the AL9 Apptainer recipe and build instructions |
 | `tests/` | pytest, laptop CPU only |
 

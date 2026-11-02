@@ -79,11 +79,15 @@ From: almalinux:9
     cd / && rm -rf /opt/src
 
     # ---------------------------------------------------------------- environment for every process
+    # Plain exports, not thisroot.sh / geant4.sh: Apptainer applies %environment with its own shell, which cannot
+    # parse thisroot.sh (it stopped there and left the ROOT and Geant4 libraries off LD_LIBRARY_PATH). Geant4 11
+    # finds its data sets at the install paths compiled in, so no G4*DATA variables are needed.
     cat > /opt/environment.sh <<'EOF'
-. /opt/root/bin/thisroot.sh >/dev/null
-. /opt/geant4/bin/geant4.sh >/dev/null
-export PATH=/opt/venv/bin:/opt/edep-sim/bin:$PATH
-export LD_LIBRARY_PATH=/opt/edep-sim/lib:/opt/edep-sim/lib64:${LD_LIBRARY_PATH:-}
+export ROOTSYS=/opt/root
+export PATH=/opt/venv/bin:/opt/edep-sim/bin:/opt/geant4/bin:/opt/root/bin:$PATH
+export LD_LIBRARY_PATH=/opt/edep-sim/lib:/opt/edep-sim/lib64:/opt/geant4/lib64:/opt/root/lib:${LD_LIBRARY_PATH:-}
+export PYTHONPATH=/opt/root/lib:${PYTHONPATH:-}
+export CMAKE_PREFIX_PATH=/opt/edep-sim:/opt/geant4:/opt/root:${CMAKE_PREFIX_PATH:-}
 EOF
 
 %environment
@@ -95,11 +99,13 @@ EOF
     exec python3 -m bdnmc_dune "$@"
 
 %test
-    . /opt/environment.sh
+    # the environment as every process gets it (%environment), not re-sourced here, so a broken one fails the test
     # on a build node without a GPU (no --nv) JAX's CUDA plugin logs a cuInit traceback before falling back to the CPU
     command -v nvidia-smi >/dev/null 2>&1 || export JAX_PLATFORMS=cpu
     python3 -c "import bdnmc_jax, bdnmc_dune, jax; print('bdnmc_jax', bdnmc_jax.PRECISION, 'jax', jax.__version__, jax.default_backend())"
     command -v edep-sim
+    if ldd "$(command -v edep-sim)" | grep "not found"; then echo "edep-sim: missing libraries"; exit 1; fi
+    python3 -c "import ROOT; print('ROOT', ROOT.gROOT.GetVersion())"
     cd /opt/bdnmc-dune && python3 -m pytest -q
 
 %labels

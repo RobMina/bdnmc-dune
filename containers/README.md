@@ -1,11 +1,18 @@
 # Containers
 
 One AlmaLinux 9 image holds both stages of a job: BdNMC's JAX port (with `bdnmc_dune`) and the ND simulation layer
-(ROOT, Geant4 with GDML, edep-sim). The user builds every image; nothing here has been built yet.
+(ROOT, Geant4 with GDML, edep-sim). The user builds every image.
 
 | Recipe | Contents | Status |
 |---|---|---|
-| `bdnmc-dune.def` | AL9 (glibc 2.34); Python 3.12 venv with `jax[cuda12]==0.12.0.1`, numpy, h5py, `bdnmc_jax` (fork `RobMina/BdNMC`, branch `gpu-port`) and `bdnmc_dune` (this checkout); ROOT 6.36.04 (no OpenGL), Geant4 11.4.0 (GDML, data sets), edep-sim 4.4.0 (no event display), built from source | written, not built |
+| `bdnmc-dune.def` | AL9 (glibc 2.34); Python 3.12 venv with `jax[cuda12]==0.12.0.1`, numpy, h5py, `bdnmc_jax` (fork `RobMina/BdNMC`, branch `gpu-port`) and `bdnmc_dune` (this checkout); ROOT 6.36.04 (no OpenGL), Geant4 11.4.0 (GDML, data sets), edep-sim 4.4.0 (no event display), built from source | built (2026-11-01) and run end to end on a V100 (top-level README, Status) |
+
+**Environment.** Apptainer applies `%environment` with its own shell interpreter, which cannot parse ROOT's
+`thisroot.sh` (it prints `thisroot.sh:214:13: parameter expansion requires a literal` and stops there). Images
+built before this was fixed source `thisroot.sh` and `geant4.sh` there and so lack the ROOT and Geant4 library
+paths: `edep-sim` fails with `libG4Tree.so: cannot open shared object file`. The recipe now writes plain exports to
+`/opt/environment.sh`, and `%test` checks `edep-sim`'s libraries and PyROOT in that environment. The job script
+sources `/opt/environment.sh` in bash inside the image, so it also works with the older images.
 
 ## Build
 
@@ -32,7 +39,7 @@ apptainer build --build-arg BDNMC_REF=<commit> --build-arg JOBS=32 bdnmc-dune.si
   and the Geant4 data sets add several GB.
 
 `%test` (run by `apptainer build`, or `apptainer test bdnmc-dune.sif`) imports `bdnmc_jax` and `bdnmc_dune`, finds
-`edep-sim` and runs this repository's tests.
+`edep-sim` and checks that its libraries resolve, imports PyROOT, and runs this repository's tests.
 
 ## Run
 
@@ -54,7 +61,9 @@ runs on the CPU. `apptainer run bdnmc-dune.sif <args>` is `python3 -m bdnmc_dune
   `mjkramer/sim2x2` (`run-edep-sim/run_edep_sim.sh` defaults to `sim2x2:ndlar011`; the newest tag is `ndlar012`).
   Their image metadata say **Fedora 37**, built in layers `build_base.sh`, `build_root.sh`, `build_genie.sh`,
   `build_geant4.sh`, `build_edepsim.sh`, ...; the build scripts themselves were not found in a public repository.
-- **Not checked:** that this recipe builds; the exact ROOT and Geant4 configure options DUNE uses; whether the
+- **Checked (2026-11-01):** the recipe builds (BdNMC `28c56f3`); its `%test` passes on a V100 node; both job
+  stages run in it (top-level README, Status).
+- **Not checked:** the exact ROOT and Geant4 configure options DUNE uses; whether the
   `mjkramer/sim2x2` images would run the JAX port (Fedora 37 ships Python 3.11).
 
 ## Alternative: start from DUNE's ND production image
