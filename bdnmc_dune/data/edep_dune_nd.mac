@@ -1,0 +1,20 @@
+# bdnmc-dune: edep-sim detector and physics settings for the DUNE ND hall geometries (ND-LAr, TMS, SAND), run
+# before the generator macro (EDEP_PRE_MAC). It ends with /edep/update.
+#
+# The settings are those of DUNE's ND production, github.com/DUNE/ND_Production, run-edep-sim/macros/dune-nd.mac
+# at commit d91b4c14b771e70ed73f959a156761983ca8e126 (Apache License 2.0), with these changes: the generator
+# commands are left out (bdnmc-dune's generator macro reads its HEPEVT file instead of GENIE's rooTracker file), and
+# so is /edep/db/set/requireEventsWithHits, so that the edep-sim events stay one to one with the HEPEVT events.
+
+# ND_Production: "Not everything is LAr"
+/edep/phys/ionizationModel 0
+
+/edep/db/set/neutronThreshold 0 MeV
+/edep/db/set/lengthThreshold 0 mm
+/edep/db/set/gammaThreshold 0 MeV
+
+# One trajectory per hit segment in ND-LAr's active argon (the segment detector volTPCActive of the GDML); it must
+# come before /edep/update.
+/edep/hitSeparation volTPCActive -1 mm
+
+/edep/update

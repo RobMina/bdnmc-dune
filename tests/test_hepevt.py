@@ -132,3 +132,34 @@ def test_job_script_runs_generation_only(tmp_path):
     subprocess.run(["bash", str(script)], env=env, check=True, cwd=tmp_path)
     called = (tmp_path / "out" / "called").read_text().split()
     assert called[:4] == ["-m", "bdnmc_dune", "run", "c.dat"] and "--gdml-offset" in called and "0,1,2" in called
+
+
+def test_jobspec_embeds_the_detector_macro(tmp_path):
+    # the packaged DUNE ND macro, embedded: the job writes it to $OUTDIR/edep_pre.mac and points EDEP_PRE_MAC at it
+    from importlib import resources
+    mac = resources.files("bdnmc_dune").joinpath("data", "edep_dune_nd.mac").read_text()
+    cmds = [ln for ln in mac.splitlines() if ln.startswith("/")]
+    assert cmds[-1] == "/edep/update" and "/edep/hitSeparation volTPCActive -1 mm" in cmds
+    assert not any(c.startswith("/generator") or "requireEventsWithHits" in c for c in cmds)
+    spec = jobspec.JobSpec("h2", "seed 3\n", geometry="/site/nd.gdml", edep_pre_mac_text=mac, skip_edepsim=True)
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    (bindir / "python3").write_text("#!/bin/sh\n:\n")
+    (bindir / "python3").chmod(0o755)
+    out = tmp_path / "out"
+    subprocess.run(["bash", "-c", spec.script()], env={"PATH": f"{bindir}:/usr/bin:/bin", jobspec.OUT_VAR: str(out)},
+                   check=True, cwd=tmp_path)
+    assert (out / "edep_pre.mac").read_text() == mac.rstrip("\n") + "\n"
+    s = spec.script()
+    assert s.index("export EDEP_PRE_MAC=''") < s.index('export EDEP_PRE_MAC="$OUTDIR/edep_pre.mac"')
+    with pytest.raises(ValueError):
+        jobspec.JobSpec("h3", "seed 3\n", geometry="g", edep_pre_mac="/site/a.mac", edep_pre_mac_text=mac)
+
+
+def test_nd_hall_frame_override():
+    from importlib import resources
+    from bdnmc_dune import config
+    path = resources.files("bdnmc_dune").joinpath("data", "frames", "nd_hall_v2026.03.06.toml")
+    cfg = config.load(str(path))
+    assert cfg.value("frame.gdml_offset") == [0.0, -0.668713, 6.657559]
+    assert "volTPCActive" in cfg.source("frame.gdml_offset")

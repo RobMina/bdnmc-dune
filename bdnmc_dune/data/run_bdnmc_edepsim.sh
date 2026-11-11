@@ -74,7 +74,8 @@ if (( EDEP_EVENTS > 0 && EDEP_EVENTS < n )); then
     n=$EDEP_EVENTS
 fi
 
-# Stage 2: edep-sim (-C validates the geometry; -u applies /edep/update when no detector macro is given).
+# Stage 2: edep-sim (-C turns off its geometry overlap check, which is on by default, as DUNE's ND production runs it;
+# -u applies /edep/update when no detector macro is given).
 macros=("$OUTDIR/generator.mac")
 update=(-u)
 if [[ -n "$EDEP_PRE_MAC" ]]; then

@@ -3,8 +3,8 @@
 
 hep-endpoints moves a job script to a site, runs it and brings its output directory back (Slurm over SSH, Fermilab
 EAF, FNAL grid through jobsub); the site settings are its `HEPEP_*` variables or keyword arguments. This module:
-- `JobSpec.script()`: jobs/run_bdnmc_edepsim.sh with its inputs set and the card embedded, so the job needs only
-  the image and the geometry at the site; by default it writes to the endpoint's output directory (`$BDNMC_OUT`);
+- `JobSpec.script()`: jobs/run_bdnmc_edepsim.sh with its inputs set and the card (and, if given, the edep-sim
+  detector macro) embedded, so the job needs only the image and the geometry at the site; by default it writes to the endpoint's output directory (`$BDNMC_OUT`);
 - `JobSpec.resources()`: cores, memory, GPUs, wall time (the fields of hependpoints.Resources);
 - `endpoint(name, **kw)`, `submit(spec, endpoint)`: an endpoint with bdnmc-dune's job environment (variables
   `BDNMC_*`, job names `bdnmcdune_<handle>`), and the submission. Status, fetch and cancel are the endpoint's own.
@@ -37,7 +37,8 @@ class JobSpec:
     minutes: int = 120
     outdir: str = ""  # "" = the endpoint's output directory ($BDNMC_OUT), or ./out outside an endpoint
     gdml_offset: tuple = (0.0, 0.0, 0.0)
-    edep_pre_mac: str = ""
+    edep_pre_mac: str = ""  # path at the site of the edep-sim detector macro (EDEP_PRE_MAC)
+    edep_pre_mac_text: str = ""  # or its text, embedded in the script like the card (e.g. data/edep_dune_nd.mac)
     edep_events: int = 0  # simulate at most this many edep-sim events (0: all)
     skip_edepsim: bool = False
     extra_env: dict = field(default_factory=dict)
@@ -51,6 +52,10 @@ class JobSpec:
             raise ValueError("geometry (the ND GDML at the site) is required unless skip_edepsim")
         if "BDNMC_CARD_EOF" in self.card_text:
             raise ValueError("card text contains the heredoc delimiter")
+        if self.edep_pre_mac and self.edep_pre_mac_text:
+            raise ValueError("edep_pre_mac (a path at the site) or edep_pre_mac_text (embedded), not both")
+        if "BDNMC_MAC_EOF" in self.edep_pre_mac_text:
+            raise ValueError("edep-sim macro text contains the heredoc delimiter")
 
     def env(self):
         """The job script's inputs (jobs/run_bdnmc_edepsim.sh)."""
@@ -71,6 +76,9 @@ class JobSpec:
         prelude += [f"export {k}={shlex.quote(v)}" for k, v in env.items()]
         prelude += ['mkdir -p "$OUTDIR"', "cat > \"$CARD\" <<'BDNMC_CARD_EOF'", self.card_text.rstrip("\n"),
                     "BDNMC_CARD_EOF"]
+        if self.edep_pre_mac_text:
+            prelude += ['export EDEP_PRE_MAC="$OUTDIR/edep_pre.mac"', "cat > \"$EDEP_PRE_MAC\" <<'BDNMC_MAC_EOF'",
+                        self.edep_pre_mac_text.rstrip("\n"), "BDNMC_MAC_EOF"]
         return "\n".join(prelude) + "\n" + body
 
     def resources(self):

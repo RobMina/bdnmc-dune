@@ -1,0 +1,17 @@
+# frame.gdml_offset for DUNE's ND hall geometry nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml (dunendggd tag
+# v2026.03.06, commit 9802970), as distributed in github.com/DUNE/ND_Production, geometry/, at commit
+# d91b4c14b771e70ed73f959a156761983ca8e126 (sha256 of the file:
+# d25940daa282eebbf1ef091b862329094006cab4e01fe0751a92bef9b1dd0a42). Use: --config <this file>.
+#
+# Read with `python -m bdnmc_dune gdml-frame <gdml>` (bdnmc_dune/gdml.py): the centre of the union box of the 70
+# placements of volTPCActive (ND-LAr's active argon, the segment detector), 6.942 x 2.996 x 4.957 m. The world axes
+# are the hall frame's: no rotation between the world and ND-LAr's modules, +z downstream (ND-LAr, TMS and SAND at
+# z = 6.66, 14.86 and 23.91 m), +y up (crane rails and elevator block at y = +5.6 m, the hall centre at +1.0 m).
+# ND_Production's GENIE flux configuration (run-genie/flux/GNuMIFlux.xml, param_set DUNEND) puts the beam in the same
+# frame with one rotation about x, so the beam's horizontal projection is the world z.
+#
+# The same ND-LAr placement is not checked for the other variants (drift1, anti_fiducial, PRISM shifts): run
+# gdml-frame on the file used.
+
+[frame]
+gdml_offset = { value = [0.0, -0.668713, 6.657559], unit = "m (x, y, z)", source = "nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml (ND_Production d91b4c1): centre of volTPCActive's placements, python -m bdnmc_dune gdml-frame" }

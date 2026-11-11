@@ -38,13 +38,22 @@ intermediate file. Both read the same cards.
    positions to produce, and with what exposure each, is open.
 4. **Numbers to settle** (all configuration fields):
    - the beam slope at the ND: 5.3 deg (ND CDR p. 8-250, used) against the 5.8 deg primary-beam bend of the LBNF
-     CDR (Vol. 3 p. 6-99);
+     CDR (Vol. 3 p. 6-99). DUNE's ND production uses the second: its GENIE flux configuration
+     (`DUNE/ND_Production`, `run-genie/flux/GNuMIFlux.xml`, param set `DUNEND`) turns the beam about x by 0.101 rad
+     (5.79 deg) in the ND hall geometry's frame;
+   - the beam's height in the hall: the ND CDR puts it through the active volume's centre (used). The same flux
+     configuration ties the beam to the point (0, 0.054, 6.66) m of its geometry, "the center of LArActive" in a 2020
+     geometry; in the current hall geometry (below) the active centre is at (0, -0.669, 6.658) m, so either that
+     configuration is not the one used with it, or DUNE's beam passes 0.72 m above the active centre there;
    - the 574 m: measured to which point of ND-LAr (front face or centre; the centre is used) and from where (the
-     target, or the start of horn 1 as in TDR Vol. II p. 8-244), worth +-2.5 m;
+     target, or the start of horn 1 as in TDR Vol. II p. 8-244), worth +-2.5 m. The same flux configuration puts
+     that 2020 active centre 562.12 m along the beam from the origin of the beam simulation's coordinates;
    - the generator-level cuts (`min_scatter_energy` 35 MeV etc., the fork's generic values, not DUNE thresholds),
      `alpha_D` = 0.5 (DUNE's study), `epsilon` and `m_V/m_chi` = 3 (benchmarks);
-   - `frame.gdml_offset`: where ND-LAr's active-volume centre sits in the GDML the simulation uses (not a published
-     number; read it from the geometry).
+   - `frame.gdml_offset`: where ND-LAr's active-volume centre sits in the GDML the simulation uses. Not a published
+     number: `python -m bdnmc_dune gdml-frame <gdml>` reads it from the geometry. Done for DUNE's current ND hall
+     geometry (The DUNE ND geometry, below), packaged as `bdnmc_dune/data/frames/nd_hall_v2026.03.06.toml`; the
+     default stays 0 (the detector-centred frame), and any other GDML needs its own reading.
 
 ## Status
 
@@ -62,7 +71,22 @@ First version (2026-10-31).
   electron momenta agree to 1e-9 (relative); the median electron deposits 99.1 % of its kinetic energy in the
   box (10 % quantile 47 %: showers leaving the bare box). edep-sim's default output keeps every trajectory,
   about 0.44 MB per event at these energies.
-- **Not yet run:** a DUNE ND geometry (with its `EDEP_PRE_MAC` settings and `frame.gdml_offset`).
+- **Run end to end in DUNE's ND hall geometry (2026-11-11):** the same card, hardware and image, with
+  `nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml` (ND-LAr, TMS, SAND; The DUNE ND geometry, below), its frame
+  override and `data/edep_dune_nd.mac`. Generation: 2^24 trials in 24.7 s, the same 602037 events (same seed). edep-sim: the
+  first 2000 in 257 s, after about 40 s reading the geometry (1.6 million nodes); 0.42 MB per event. Checked with
+  `jobs/check_edepsim.py --active volTPCActive --frame ...`:
+  - vertices equal the HEPEVT vertices to 1e-13 cm, the times are equal, the momenta agree to 1e-9;
+  - 89.7 % of the vertices are in ND-LAr's active argon (`volTPCActive`). That is what a uniform spread in BdNMC's
+    7 x 3 x 5 m box gives: the 70 active boxes fill 93.9 of its 105 m^3 (0.894). The rest are in the modules'
+    other volumes (argon between modules 4.9 %, light detectors 1.8 %, field cages 1.6 %, backplates, pixel
+    planes and boards 2 %). None is outside ND-LAr's modules;
+  - all 70 active boxes get vertices, and ROOT's centre for each (from the geometry edep-sim stores) equals
+    `gdml-frame`'s to 2e-16 m;
+  - deposits: the segment detectors hit are `volTPCActive` (73.95 % of the summed electron kinetic energy) and
+    `volTMS` (0.83 %), none in SAND. Per electron (deposit / kinetic energy), the 10/50/90 % quantiles are
+    0.294 / 0.906 / 0.983 overall, 0.474 / 0.913 / 0.984 for vertices in active argon and 0.075 / 0.430 / 0.962
+    for the others. The electrons have a median kinetic energy of 576 MeV, ranging from 34.5 MeV to 22 GeV.
 - **Placeholders:** the in-process mode (design above); detectors other than ND-LAr; real LBNF meson lists.
 
 ## The edep-sim input
@@ -82,10 +106,57 @@ From edep-sim's source (`src/kinem/EDepSimHEPEVTKinematicsGenerator.cc`, edep-si
   both electrons at the second one, so `bdnmc_dune.hepevt.write` asks the fork's `write_hepevt` for one event
   per interaction point (`per_interaction=True`), with an index file back to BdNMC's events;
 - **verified in edep-sim** (Status): vertices, times and momenta arrive unchanged, one primary per event;
-- **not verified:** the detector and physics macro settings for the DUNE ND geometry (DUNE's ND_Production uses e.g. `/edep/hitSeparation volTPCActive -1 mm` in
-  `run-edep-sim/macros/dune-nd.mac`; pass such settings as `EDEP_PRE_MAC`).
+- **used in edep-sim** (Status): the detector and physics settings of DUNE's ND production
+  (`run-edep-sim/macros/dune-nd.mac` of `DUNE/ND_Production`), as `bdnmc_dune/data/edep_dune_nd.mac`: the
+  ionisation model, zero thresholds, and `/edep/hitSeparation volTPCActive -1 mm` (one trajectory per hit segment
+  in the active argon). Left out: the generator commands, and `/edep/db/set/requireEventsWithHits`, which would drop
+  events without hits and break the one-to-one match with the HEPEVT file. The line `volTPCActive is not found in /`
+  that `/edep/hitSeparation` prints is harmless: the command creates the segment detector by name before the GDML
+  is read, and the GDML's `SensDet` auxiliary then gets the same one;
+- **from the code** (`app/edepSim.cc`): `-C` turns edep-sim's geometry overlap check off (it is on by default); the
+  job script passes it, as ND_Production's does.
 
 Vertex times are BdNMC's: seconds since production at the target, written in ns (about 1.9 us at 574 m).
+
+## The DUNE ND geometry
+
+**Source.** DUNE's ND hall geometries are made with `github.com/DUNE/dunendggd` (GeGeDe; its `setup.py` declares
+GPLv2, and the repository has no licence file). DUNE's ND production repository, `github.com/DUNE/ND_Production`
+(Apache-2.0), distributes the generated GDML files. Nothing from dunendggd is in this repository, and no GDML is
+committed. The geometry used is ND_Production's `geometry/nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml` (73 MB;
+dunendggd tag `v2026.03.06`, commit `9802970`, recorded in the world volume's auxiliaries), fetched at a fixed
+commit:
+
+```bash
+curl -sSfLO https://raw.githubusercontent.com/DUNE/ND_Production/d91b4c14b771e70ed73f959a156761983ca8e126/geometry/nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml
+```
+
+```bash
+sha256sum nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml   # d25940daa282eebbf1ef091b862329094006cab4e01fe0751a92bef9b1dd0a42
+```
+
+To make it from dunendggd instead (not tried here): `pip install` GeGeDe and dunendggd into a venv, then `make` the target
+`nd_hall_with_lar_tms_sand_stt1.gdml` of its `Makefile`. The other targets (no SAND, PRISM shifts) give other
+files, and each needs its own `gdml-frame` reading.
+
+**Frame.** `python -m bdnmc_dune gdml-frame <gdml> --landmark volTMS --landmark volSAND --landmark craneRail1_lv`
+(`bdnmc_dune/gdml.py`, standard-library XML, Geant4's transform convention; 12 s on one core) gives:
+- ND-LAr's active argon: 70 placements of the box `volTPCActive` (0.468 x 2.996 x 0.957 m; 7 modules across, 2
+  drift volumes each, 5 along the beam), the segment detector `volTPCActive`. Their union is 6.942 x 2.996 x 4.957 m
+  and is centred at **(0.000, -0.669, 6.658) m** in the world frame, which is `frame.gdml_offset`
+  (`bdnmc_dune/data/frames/nd_hall_v2026.03.06.toml`). The boxes add up to 93.9 m^3 (131 t of argon) against the
+  105 m^3 (147 t) of the published 7 x 3 x 5 m;
+- axes: every volume from the world down to ND-LAr's modules is placed without rotation. The drift volumes are
+  either unrotated or turned 180 deg about y, which leaves their union unchanged. +z points downstream: ND-LAr, TMS
+  and SAND are at z = 6.66, 14.86 and 23.91 m, in the order the ND CDR gives along the beam. +y points up: the crane
+  rails and the elevator block are at y = +5.6 m, against +1.0 m for the hall's centre. So the world frame is the
+  hall frame of `geometry.py`, and no rotation is needed. The GDML has no beam in it. ND_Production's flux
+  configuration (Decisions, item 4) rotates the beam about x only, so the beam's horizontal projection is the
+  world z;
+- the other segment detectors: TMS scintillator (`volTMS`), SAND's calorimeter (`EMCalSci`), straws (`Straw`) and
+  GRAIN argon (`LArHit`).
+
+The frame of the run in Status is checked a second way: ROOT's import of the same GDML gives the same 70 centres.
 
 ## Use
 
@@ -119,6 +190,19 @@ argon box, a segment detector, in the detector-centred frame). After the job, in
 
 ```bash
 python3 jobs/check_edepsim.py <out>/events.edepsim.root <out>/events.hepevt
+```
+
+With a DUNE ND geometry, give the frame and the detector macro too, and check where the vertices land (The DUNE ND
+geometry, above):
+
+```bash
+python -m bdnmc_dune jobspec <card> --handle <name> --geometry <site>/nd_hall_with_lar_tms_sand_stt1_v2026.03.06.gdml \
+    --config bdnmc_dune/data/frames/nd_hall_v2026.03.06.toml --embed-pre-mac bdnmc_dune/data/edep_dune_nd.mac \
+    --image <sif at the site> --gpus 1 --edep-events 2000 --submit slurm_ssh
+```
+
+```bash
+python3 jobs/check_edepsim.py <out>/events.edepsim.root <out>/events.hepevt --active volTPCActive --frame ndlar_frame.json
 ```
 
 ```bash
@@ -167,10 +251,13 @@ arXiv:2002.03005; LBNF CDR Vol. 3 = arXiv:1601.05823; PDG liquid argon.
 | `bdnmc_dune/cards.py` | card generator and mass scans (pi0, eta, brem; off-axis positions) |
 | `bdnmc_dune/hepevt.py`, `edepsim.py` | edep-sim HEPEVT input via `write_hepevt`, one vertex per event; the edep-sim macro |
 | `bdnmc_dune/jobspec.py` | the job for hep-endpoints (script + resources), its endpoint and submission |
-| `bdnmc_dune/cli.py` | `python -m bdnmc_dune {cards,run,frame,macro,jobspec,job}` |
+| `bdnmc_dune/cli.py` | `python -m bdnmc_dune {cards,run,frame,macro,jobspec,job,testgeom,gdml-frame}` |
 | `bdnmc_dune/testgeom.py` | the smoke-test GDML (one argon box) |
+| `bdnmc_dune/gdml.py` | placements in a GDML (Geant4's transform convention): `frame.gdml_offset` and the axes check (`gdml-frame`) |
+| `bdnmc_dune/data/edep_dune_nd.mac` | edep-sim detector and physics settings for DUNE's ND hall geometries (from ND_Production, Apache-2.0) |
+| `bdnmc_dune/data/frames/` | `frame.gdml_offset` overrides for named DUNE geometries, with how each was read |
 | `bdnmc_dune/data/run_bdnmc_edepsim.sh` (linked from `jobs/`) | the two-stage job script |
-| `jobs/check_edepsim.py` | edep-sim output against its HEPEVT input (vertices, times, momenta, deposits) |
+| `jobs/check_edepsim.py` | edep-sim output against its HEPEVT input (vertices, times, momenta, deposits per detector; the volume of each vertex) |
 | `containers/` | the AL9 Apptainer recipe and build instructions |
 | `tests/` | pytest, laptop CPU only |
 

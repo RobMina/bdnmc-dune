@@ -8,6 +8,7 @@
   jobspec  build the hep-endpoints job (self-contained script + resources) for one card; --submit ENDPOINT sends it
   job      status, fetch or cancel a submitted job
   testgeom write a minimal GDML (ND-LAr's active volume as one argon box) for a smoke test of edep-sim
+  gdml-frame  read ND-LAr's active-volume placements from a GDML: frame.gdml_offset and the axes check
 """
 import argparse
 import hashlib
@@ -99,6 +100,7 @@ def cmd_jobspec(a):
         a.handle, a.card, geometry=a.geometry, image=a.image, trials=a.trials, batch=a.batch,
         precision=a.precision, gpus=a.gpus, gpu_type=a.gpu_type, cores=a.cores, mem_gb=a.mem_gb,
         minutes=a.minutes, outdir=a.outdir, edep_pre_mac=a.edep_pre_mac, edep_events=a.edep_events,
+        edep_pre_mac_text=Path(a.embed_pre_mac).read_text() if a.embed_pre_mac else "",
         skip_edepsim=a.skip_edepsim,
         gdml_offset=tuple(a.gdml_offset if a.gdml_offset is not None else cfg.value("frame.gdml_offset")))
     if a.script:
@@ -114,6 +116,17 @@ def cmd_testgeom(a):
     from . import config, testgeom
     Path(a.out).write_text(testgeom.box_gdml(config.load(*a.config)))
     print(f"wrote {a.out}")
+
+
+def cmd_gdml_frame(a):
+    import hashlib as _h
+    from . import gdml
+    rep = gdml.frame_report(gdml.load(a.gdml), active=a.active, landmarks=a.landmark)
+    rep = {"gdml": str(a.gdml), "gdml_sha256": _h.sha256(Path(a.gdml).read_bytes()).hexdigest()} | rep
+    text = json.dumps(rep, indent=1) + "\n"
+    if a.out:
+        Path(a.out).write_text(text)
+    sys.stdout.write(text)
 
 
 def cmd_job(a):
@@ -193,7 +206,9 @@ def main(argv=None):
     p.add_argument("--minutes", type=int, default=120)
     p.add_argument("--outdir", default="", help="output directory in the job (default: the endpoint's, $BDNMC_OUT)")
     p.add_argument("--gdml-offset", type=_offset)
-    p.add_argument("--edep-pre-mac", default="")
+    p.add_argument("--edep-pre-mac", default="", help="edep-sim detector macro: its path at the site")
+    p.add_argument("--embed-pre-mac", type=Path, help="edep-sim detector macro: a local file embedded in the job "
+                   "script (e.g. bdnmc_dune/data/edep_dune_nd.mac for DUNE's ND hall geometries)")
     p.add_argument("--edep-events", type=int, default=0, help="simulate at most N edep-sim events (0: all)")
     p.add_argument("--skip-edepsim", action="store_true")
     p.add_argument("--script", type=Path, help="also write the rendered job script here")
@@ -207,6 +222,14 @@ def main(argv=None):
     common(p)
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=cmd_testgeom)
+
+    p = sub.add_parser("gdml-frame", help="ND-LAr's active volume in a GDML world: frame.gdml_offset and axes")
+    p.add_argument("gdml", type=Path)
+    p.add_argument("--active", default="volTPCActive", help="the active (box) volume, placed once per TPC")
+    p.add_argument("--landmark", action="append", default=[], help="also print the world origin of this volume's "
+                   "placements (repeatable), e.g. volTMS, volSAND to see which way +z points")
+    p.add_argument("--out", type=Path, help="also write the JSON report here")
+    p.set_defaults(func=cmd_gdml_frame)
 
     p = sub.add_parser("job", help="status, fetch or cancel a submitted job (hep-endpoints)")
     p.add_argument("action", choices=("status", "fetch", "cancel"))

@@ -20,7 +20,7 @@ test = ["pytest", "h5py"]
 include = ["bdnmc_dune*"]
 
 [tool.setuptools.package-data]
-bdnmc_dune = ["data/*.toml", "data/*.sh"]
+bdnmc_dune = ["data/*.toml", "data/*.sh", "data/*.mac", "data/frames/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
