@@ -241,6 +241,26 @@ arXiv:2002.03005; LBNF CDR Vol. 3 = arXiv:1601.05823; PDG liquid argon.
 | alpha_D | 0.5 | TDR Vol. II p. 8-271 |
 | liquid argon | 1.396 g/cm^3, Z = 18, A = 39.948 (N = 22: argon-40) | PDG |
 
+## Published studies to compare with
+
+Light-dark-matter studies for the DUNE ND that this package's outputs can be compared with (checked against arXiv
+on 2026-11-11). None of them uses BdNMC: they take pi0 and eta from Pythia (4.5 and 0.5 per POT, the same
+normalisation as here) with their own acceptance Monte Carlo, and quote no signal counts in the text, so numbers
+come from their figures. No comparison has been made yet.
+
+| Paper | Simulation and benchmark | What to compare |
+|---|---|---|
+| V. De Romeri, K. J. Kelly, P. A. N. Machado, *Hunting On- and Off-Axis for Light Dark Matter with DUNE-PRISM*, arXiv:1903.10505, PRD 100, 095010 (2019). The basis of DUNE's own study | Pythia8 pi0 and eta from the primary interaction only; no kaons, no proton brem. ND at 574 m, 75 t fiducial; off axis 0-36 m; E_e θ_e² < 2 MeV rad². **Scalar** DM at α_D = 0.1 (fermion DM in App. E: M_χ = 20 MeV, M_A' = 3 M_χ) | Fig. 3: signal events per year against off-axis distance at (M_A', M_DM) = (90, 30) MeV, α_D ε⁴ = 1e-15, one year per position (the `--off-axis prism` cards, rescaled in ε⁴ α_D). Fig. 4/9: normalised electron-energy spectra. Fig. 8: E_e θ_e² |
+| DUNE Collaboration, *Prospects for Beyond the Standard Model Physics Searches at DUNE*, arXiv:2008.12769, EPJC 81 (2021) 322, Sec. 8.1 (also TDR Vol. II Sec. 8.8.2) | pi0 and eta (Pythia), proton brem stated to be subdominant; α_D = 0.5, M_V = 3 M_χ; 3.5 yr ν + 3.5 yr ν̄; DUNE-PRISM 0-24 m in 6 m steps; backgrounds ν_μ-e and ν_e CCQE (10 % normalisation, 1 % per bin) | Fig. 19, the 90 % CL sensitivity in Y against mass, on axis and with DUNE-PRISM: needs a background model, so it checks a full sensitivity chain rather than the generator |
+| M. Breitbach, L. Buonocore, C. Frugiuele, J. Kopp, L. Mittnacht, *Searching for Physics Beyond the Standard Model in an Off-Axis DUNE Near Detector*, arXiv:2102.03383, JHEP 01 (2022) 048 | independent DUNE-PRISM study of DM scattering and heavy-neutral-lepton decays | finds that for DM coupling to leptons on-axis data give marginally stronger limits than off-axis: a cross-check of the off-axis trend |
+| G. Krnjaic, N. Toro et al., *Snowmass Whitepaper: Dark Matter Production at Intensity-Frontier Experiments*, arXiv:2207.00597 | review | context for Y-against-mass plots and thermal targets |
+| P. deNiverville, C.-Y. Chen, M. Pospelov, A. Ritz, arXiv:1609.01770, PRD 95, 035006 (2017) | the BdNMC paper | the generator itself |
+
+Differences to expect against 1903.10505, besides the scalar/fermion model:
+- **Parent angular distributions:** BdNMC's (BMPT for pi0, BMPT's K0 shape for eta) differ from Pythia's, at the same normalisation.
+- **Proton brem:** it is left out there, but is a channel here.
+- **Detector:** its 75 t fiducial volume and 3 x 4 x 5 m size, against the TDR's 67.2 t (6 x 2 x 4 m) used here.
+
 ## Layout
 
 | Path | Role |
