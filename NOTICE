@@ -1,0 +1,9 @@
+bdnmc-dune
+Copyright (c) 2026 the bdnmc-dune contributors. Licensed under the MIT License (LICENSE).
+
+Third-party material:
+- The cards that bdnmc_dune.cards writes follow the generic parameter cards of RobMina/BdNMC (MIT License,
+  Copyright (c) 2015-2021 Brian Batell, Patrick deNiverville).
+- bdnmc_dune/data/edep_dune_nd.mac holds the edep-sim settings of DUNE's ND production,
+  github.com/DUNE/ND_Production, run-edep-sim/macros/dune-nd.mac at commit d91b4c14b771e70ed73f959a156761983ca8e126
+  (Apache License 2.0), modified as its header describes.
