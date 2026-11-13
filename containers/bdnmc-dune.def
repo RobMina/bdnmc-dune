@@ -54,16 +54,23 @@ From: almalinux:9
 
     # ---------------------------------------------------------------- stage B: ROOT, Geant4, edep-sim
     mkdir -p /opt/src && cd /opt/src
+    # Source tarballs go to a file first: with retries that resume (-C -) a dropped transfer continues instead of
+    # failing the build, and gzip -t refuses a truncated file before tar sees it.
+    fetch() {
+        curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors -C - -o "$2" "$1"
+        gzip -t "$2"
+        tar xzf "$2" && rm -f "$2"
+    }
     # ROOT (C++17, like Geant4; edep-sim checks that ROOT and its own C++ standard agree). PyROOT against the
     # venv's Python so edep-sim's ROOT files can be read from the same interpreter. No OpenGL (a batch image): with
     # opengl off, builtin GLEW must stay off too, since its build requires the OpenGL libraries.
-    curl -fsSL "https://root.cern/download/root_v{{ ROOT_VERSION }}.source.tar.gz" | tar xz
+    fetch "https://root.cern/download/root_v{{ ROOT_VERSION }}.source.tar.gz" root.tar.gz
     cmake -S "root-{{ ROOT_VERSION }}" -B root-build -DCMAKE_INSTALL_PREFIX=/opt/root -DCMAKE_CXX_STANDARD=17 \
         -Dgdml=ON -Dopengl=OFF -Dx11=ON -Dpyroot=ON -DPython3_EXECUTABLE=/opt/venv/bin/python \
         -Dbuiltin_gsl=ON -Dbuiltin_tbb=ON -Droofit=OFF -Dtmva=OFF -Dxrootd=OFF
     cmake --build root-build -j"{{ JOBS }}" --target install
     # Geant4 with GDML (required by edep-sim) and its data sets (several GB; downloaded at build time).
-    curl -fsSL "https://gitlab.cern.ch/geant4/geant4/-/archive/v{{ GEANT4_VERSION }}/geant4-v{{ GEANT4_VERSION }}.tar.gz" | tar xz
+    fetch "https://gitlab.cern.ch/geant4/geant4/-/archive/v{{ GEANT4_VERSION }}/geant4-v{{ GEANT4_VERSION }}.tar.gz" geant4.tar.gz
     cmake -S "geant4-v{{ GEANT4_VERSION }}" -B geant4-build -DCMAKE_INSTALL_PREFIX=/opt/geant4 \
         -DCMAKE_CXX_STANDARD=17 -DGEANT4_USE_GDML=ON -DGEANT4_INSTALL_DATA=ON -DGEANT4_BUILD_MULTITHREADED=OFF
     cmake --build geant4-build -j"{{ JOBS }}" --target install
